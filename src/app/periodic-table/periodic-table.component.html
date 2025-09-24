@@ -1,0 +1,17 @@
+<div class="modal-overlay">
+  <div class="modal-content">
+    <h2>Periodic Table</h2>
+    <div class="periodic-table-grid">
+      <button *ngFor="let element of elements" 
+              class="element-cell" 
+              [style.grid-row]="element.row" 
+              [style.grid-column]="element.col"
+              (click)="selectElement(element)">
+        <div class="atomic-number">{{ element.atomicNumber }}</div>
+        <div class="symbol">{{ element.symbol }}</div>
+        <div class="name">{{ element.name }}</div>
+      </button>
+    </div>
+    <button class="close-button" (click)="closeModal()">Close</button>
+  </div>
+</div>

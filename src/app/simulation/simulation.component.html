@@ -1,0 +1,129 @@
+<app-periodic-table
+  *ngIf="showPeriodicTable"
+  (elementSelect)="onElementSelect($event)"
+  (close)="togglePeriodicTable()">
+</app-periodic-table>
+
+<app-molecular-catalog
+  *ngIf="showMolecularCatalog"
+  [discoveredMolecules]="discoveredMolecules"
+  [currentMolecules]="moleculeNames"
+  (close)="toggleMolecularCatalog()"
+  (recipeSelected)="onRecipeSelected($event)"
+  (createReactantsRequested)="onCreateReactants($event)">
+</app-molecular-catalog>
+
+<div class="ui-container">
+  <div class="ui-row">
+    <button (click)="togglePeriodicTable()">Select Element</button>
+    <button (click)="toggleMolecularCatalog()">Molecular Catalog</button>
+    <button (click)="addAtom()">Add Hydrogen</button>
+  </div>
+  <hr>
+
+  <div class="atom-list">
+    <p>Atoms in Scene:</p>
+    <div *ngFor="let atom of atoms"
+         class="atom-list-item"
+         (click)="selectAtom(atom)"
+         [class.selected]="atom.id === selectedAtom?.id">
+      <span>{{ atom.elementName }}</span>
+      <button class="delete-btn" (click)="deleteAtomClicked($event, atom)">X</button>
+    </div>
+  </div>
+
+  <div *ngIf="molecules.length > 0">
+    <hr>
+    <p>Molecules Formed:</p>
+    <div *ngFor="let name of moleculeNames" class="molecule-name">
+      {{ name }}
+    </div>
+  </div>
+
+  <div *ngIf="discoveredMolecules.length > 0">
+    <hr>
+    <p>Discovered Molecules: {{ discoveredMolecules.length }}</p>
+    <div *ngFor="let molecule of discoveredMolecules" class="discovered-molecule">
+      <span class="molecule-name">{{ molecule }}</span>
+    </div>
+  </div>
+
+  <div class="energy-controls">
+    <hr>
+    <p>Energy System:</p>
+    <div class="ui-row">
+      <button
+        (click)="setEnergyType('electrolysis')"
+        [class.active]="currentEnergyType === 'electrolysis'">
+        Electrolysis
+      </button>
+      <button
+        (click)="setEnergyType('heat')"
+        [class.active]="currentEnergyType === 'heat'">
+        Heat
+      </button>
+      <button
+        (click)="setEnergyType('collision')"
+        [class.active]="currentEnergyType === 'collision'">
+        Collision
+      </button>
+    </div>
+    <p class="energy-instructions">
+      Global energy controls - individual atom energy application removed
+    </p>
+
+    <div class="ui-row">
+      <label>Global Heat: </label>
+      <button (click)="toggleGlobalHeating()" [class.active]="globalHeatEnabled">
+        {{ globalHeatEnabled ? 'On' : 'Off' }}
+      </button>
+    </div>
+    <div class="ui-row">
+      <label>Heat Intensity: {{ heatIntensity }}</label>
+      <input type="range" min="0" max="30" [value]="heatIntensity" (input)="heatIntensityChange($event)">
+    </div>
+    <div class="ui-row">
+      <label>Activation Energy: {{ activationEnergyWater }}</label>
+      <input type="range" min="0" max="30" [value]="activationEnergyWater" (input)="activationEnergyChange($event)">
+    </div>
+    <div class="ui-row">
+      <label>Strict Stoichiometry</label>
+      <button (click)="toggleStoichiometryStrict()" [class.active]="stoichiometryStrict">
+        {{ stoichiometryStrict ? 'Enabled' : 'Disabled' }}
+      </button>
+    </div>
+    <div class="ui-row">
+      <button (click)="applyGlobalHeatPulse()">Apply Heat Pulse</button>
+      <button (click)="applyGlobalElectrolysis()">Electrolyze All</button>
+    </div>
+  </div>
+
+  <div *ngIf="selectedAtom">
+    <hr>
+    <p>Controls for {{ selectedAtom.elementName }}:</p>
+    <div class="ui-row">
+      <span>Protons: {{ protons }}</span>
+      <button (click)="addProton()">+</button>
+      <button (click)="removeProton()">-</button>
+    </div>
+    <div class="ui-row">
+      <span>Neutrons: {{ neutrons }}</span>
+      <button (click)="addNeutron()">+</button>
+      <button (click)="removeNeutron()">-</button>
+    </div>
+    <div class="ui-row">
+      <span>Electrons: {{ electronsCount }}</span>
+      <button (click)="addElectron()">+</button>
+      <button (click)="removeElectron()">-</button>
+    </div>
+  </div>
+
+  <div *ngIf="selectedMolecule">
+    <hr>
+    <p>Selected Molecule: {{ selectedMolecule.name }}</p>
+    <p>Atoms: {{ selectedMolecule.atoms.length }}</p>
+    <p>Molecules can be moved by dragging but are not locked</p>
+  </div>
+</div>
+
+<canvas #simulationCanvas style="display: block; width: 100vw; height: 100vh;"></canvas>
