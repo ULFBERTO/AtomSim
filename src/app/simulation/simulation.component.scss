@@ -1,123 +1,443 @@
-.ui-container {
+// Variables
+$panel-bg: rgba(26, 26, 46, 0.95);
+$border-color: rgba(255, 255, 255, 0.1);
+$primary-color: #4fc3f7;
+$success-color: #4caf50;
+$warning-color: #ffc107;
+$danger-color: #f44336;
+
+// Draggable panels base
+.draggable-panel {
+  cursor: move;
+  user-select: none;
+  
+  .drag-handle {
+    cursor: move;
+    padding: 8px;
+    margin: -12px -12px 8px -12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    &::before {
+      content: '⋮⋮';
+      color: #666;
+      font-size: 12px;
+      letter-spacing: 2px;
+    }
+  }
+}
+
+// Main Controls (Left Panel)
+.main-controls {
   position: absolute;
   top: 10px;
   left: 10px;
-  background-color: rgba(0, 0, 0, 0.6);
-  color: white;
-  padding: 10px;
-  border-radius: 5px;
-  font-family: sans-serif;
-  z-index: 10;
-  min-width: 220px;
+  z-index: 100;
 }
 
-.ui-row {
+// Energy Display
+.energy-display-container {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 320px;
+  z-index: 100;
+}
+
+// Atom List Panel
+.atom-list-panel {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: $panel-bg;
+  border-radius: 12px;
+  padding: 12px;
+  width: 220px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 100;
+  border: 1px solid $border-color;
+  
+  &.dragging {
+    opacity: 0.9;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  }
+}
+
+.drag-handle {
+  cursor: move;
+  padding: 6px;
+  margin: -12px -12px 8px -12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  
+  &::before {
+    content: '⋮⋮⋮';
+    color: #555;
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    
+    &::before {
+      color: #888;
+    }
+  }
+}
+
+.panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  color: $primary-color;
+  font-weight: 600;
+  font-size: 0.9em;
 }
 
-.ui-container button {
-  cursor: pointer;
-  background-color: #444;
-  color: white;
-  border: 1px solid #666;
-  border-radius: 3px;
-  padding: 5px 8px;
-}
-
-.ui-container button:hover {
-  background-color: #555;
+.atom-count, .molecule-count {
+  background: rgba($primary-color, 0.2);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.85em;
 }
 
 .atom-list {
-  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .atom-list-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 8px;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
   cursor: pointer;
-  border-radius: 3px;
-  margin-bottom: 5px;
-  background-color: #333;
-  border: 1px solid #444;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  &.selected {
+    background: rgba($warning-color, 0.2);
+    border-color: $warning-color;
+  }
+
+  &.bonding-selected {
+    background: rgba(156, 39, 176, 0.2);
+    border-color: #9c27b0;
+  }
 }
 
-.atom-list-item:hover {
-  background-color: #4a4a4a;
-}
-
-.atom-list-item.selected {
-  background-color: #f0ad4e; /* A shade of yellow */
-  color: #222;
+.atom-symbol {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-weight: bold;
-  border-color: #eea236;
+  font-size: 0.8em;
+  color: #fff;
+}
+
+.atom-name {
+  flex: 1;
+  color: #e0e0e0;
+  font-size: 0.85em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .delete-btn {
-  background-color: #d9534f !important; /* Important to override general button styles */
-  border-color: #d43f3a !important;
-  padding: 2px 6px !important;
-  font-weight: bold;
+  width: 22px;
+  height: 22px;
+  background: rgba($danger-color, 0.2);
+  border: 1px solid $danger-color;
+  border-radius: 4px;
+  color: $danger-color;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  transition: all 0.2s;
+
+  &:hover {
+    background: $danger-color;
+    color: #fff;
+  }
 }
 
-.delete-btn:hover {
-  background-color: #c9302c !important;
+// Molecules Panel
+.molecules-panel {
+  position: absolute;
+  top: 320px;
+  right: 10px;
+  background: $panel-bg;
+  border-radius: 12px;
+  padding: 12px;
+  width: 220px;
+  max-height: 250px;
+  overflow-y: auto;
+  z-index: 100;
+  border: 1px solid rgba($success-color, 0.3);
+}
+
+.molecule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.molecule-item {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  background: rgba($success-color, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+
+  &:hover {
+    background: rgba($success-color, 0.2);
+  }
+
+  &.selected {
+    border-color: $success-color;
+    background: rgba($success-color, 0.25);
+  }
 }
 
 .molecule-name {
-  background-color: #007bff;
-  padding: 5px;
-  border-radius: 3px;
+  color: #fff;
+  font-weight: 500;
+  font-size: 0.9em;
+}
+
+.molecule-atoms {
+  color: #888;
+  font-size: 0.75em;
+  margin-top: 2px;
+}
+
+// Selected Atom Info
+.selected-info {
+  position: absolute;
+  bottom: 20px;
+  right: 10px;
+  background: $panel-bg;
+  border-radius: 12px;
+  padding: 16px;
+  width: 220px;
+  z-index: 100;
+  border: 1px solid rgba($warning-color, 0.3);
+}
+
+.info-header {
+  color: $warning-color;
+  font-weight: 600;
+  margin-bottom: 12px;
+  font-size: 1em;
+}
+
+.info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #e0e0e0;
+  font-size: 0.9em;
+}
+
+.counter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  button {
+    width: 26px;
+    height: 26px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+
+    &:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    &:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+  }
+
+  span {
+    min-width: 30px;
+    text-align: center;
+    font-weight: 600;
+    color: $primary-color;
+  }
+}
+
+// Notification Toast
+.notification-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 24px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+  animation: slideDown 0.3s ease;
+  font-size: 0.95em;
+
+  &.success {
+    background: rgba($success-color, 0.9);
+    color: #fff;
+  }
+
+  &.error {
+    background: rgba($danger-color, 0.9);
+    color: #fff;
+  }
+
+  &.info {
+    background: rgba($primary-color, 0.9);
+    color: #000;
+  }
+
+  &.warning {
+    background: rgba($warning-color, 0.9);
+    color: #000;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+// Pause Overlay
+.pause-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.pause-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 48px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 16px;
+  border: 2px solid $warning-color;
+}
+
+.pause-icon {
+  font-size: 3em;
+}
+
+.pause-text {
+  color: $warning-color;
+  font-size: 1.5em;
+  font-weight: bold;
+  letter-spacing: 4px;
+}
+
+.pause-hint {
+  color: #888;
+  font-size: 0.85em;
+  margin: 0;
   text-align: center;
-  margin-bottom: 5px;
 }
 
-hr {
-  border: 1px solid #444;
-  margin: 15px 0;
+// Canvas
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 0;
 }
 
-.energy-controls {
-  margin-top: 10px;
+// Scrollbar styling
+::-webkit-scrollbar {
+  width: 6px;
 }
 
-.energy-controls button {
-  margin-right: 5px;
-  background-color: #28a745;
-  border-color: #28a745;
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
 }
 
-.energy-controls button:hover {
-  background-color: #218838;
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
 }
 
-.energy-controls button.active {
-  background-color: #ffc107;
-  color: #212529;
-  border-color: #ffc107;
-  font-weight: bold;
-}
-
-.energy-instructions {
-  font-size: 12px;
-  color: #ccc;
-  margin-top: 8px;
-  font-style: italic;
-}
-
-.energy-btn {
-  background-color: #dc3545 !important;
-  border-color: #dc3545 !important;
-  font-weight: bold;
-  padding: 8px 12px !important;
-  width: 100%;
-}
-
-.energy-btn:hover {
-  background-color: #c82333 !important;
+// Grid overlay (when enabled)
+.grid-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 1;
+  background-image: 
+    linear-gradient(rgba(79, 195, 247, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79, 195, 247, 0.1) 1px, transparent 1px);
+  background-size: 50px 50px;
 }

@@ -13,117 +13,166 @@
   (createReactantsRequested)="onCreateReactants($event)">
 </app-molecular-catalog>
 
-<div class="ui-container">
-  <div class="ui-row">
-    <button (click)="togglePeriodicTable()">Select Element</button>
-    <button (click)="toggleMolecularCatalog()">Molecular Catalog</button>
-    <button (click)="addAtom()">Add Hydrogen</button>
-  </div>
-  <hr>
+<app-tutorial-panel
+  [showTutorial]="showTutorial"
+  [showExperiments]="showExperiments"
+  [showHints]="showHints"
+  [activeExperiment]="activeExperiment"
+  (tutorialClosed)="closeTutorial()"
+  (tutorialCompleted)="completeTutorial()"
+  (experimentSelected)="onExperimentSelected($event)"
+  (experimentsClosed)="closeExperiments()"
+  (hintsToggled)="toggleHints()"
+  (loadAtoms)="loadExperimentAtoms($event)">
+</app-tutorial-panel>
 
+<!-- Main Control Panel (Left Side) -->
+<div class="main-controls">
+  <app-control-panel
+    [currentMode]="currentSimulationMode"
+    [isPaused]="isPaused"
+    [simulationSpeed]="simulationSpeed"
+    [allowManualBonding]="currentModeConfig.controls.allowManualBonding"
+    [bondingMode]="manualBondingMode"
+    [canCreateBond]="canCreateManualBond()"
+    [selectedAtomCount]="selectedAtomsForBonding.length"
+    [showLabels]="showLabels"
+    [showElectrons]="showElectrons"
+    [showBonds]="showBondsVisual"
+    [showGrid]="showGrid"
+    [atomCount]="atoms.length"
+    [moleculeCount]="molecules.length"
+    [bondCount]="bonds.length"
+    (modeChanged)="onModeChanged($event)"
+    (pauseToggled)="togglePause()"
+    (simulationReset)="resetSimulation()"
+    (allCleared)="clearAllAtoms()"
+    (speedChanged)="onSpeedChanged($event)"
+    (periodicTableOpened)="togglePeriodicTable()"
+    (experimentsOpened)="toggleExperiments()"
+    (tutorialOpened)="openTutorial()"
+    (bondingModeToggled)="toggleManualBondingMode()"
+    (labelsToggled)="toggleLabels()"
+    (electronsToggled)="toggleElectrons()"
+    (bondsToggled)="toggleBondsVisual()"
+    (gridToggled)="toggleGrid()">
+  </app-control-panel>
+</div>
+
+<!-- Energy Display (Bottom Left) -->
+<div class="energy-display-container">
+  <app-energy-display
+    [currentEnergy]="transientHeatEnergy"
+    [maxEnergy]="100"
+    [requiredEnergy]="getRequiredEnergy()"
+    [temperature]="calculateTemperature()"
+    (energyAdded)="addSystemEnergy($event)"
+    (energyReset)="resetSystemEnergy()">
+  </app-energy-display>
+</div>
+
+<!-- Atom List (Right Side) -->
+<div class="atom-list-panel" 
+     *ngIf="atoms.length > 0"
+     [style.top.px]="panelPositions.atomList.y"
+     [style.right.px]="panelPositions.atomList.x"
+     [style.left]="'auto'"
+     (mousedown)="startDragPanel($event, 'atomList')">
+  <div class="drag-handle"></div>
+  <div class="panel-header">
+    <span>🔬 Átomos en Escena</span>
+    <span class="atom-count">{{ atoms.length }}</span>
+  </div>
   <div class="atom-list">
-    <p>Atoms in Scene:</p>
     <div *ngFor="let atom of atoms"
          class="atom-list-item"
          (click)="selectAtom(atom)"
-         [class.selected]="atom.id === selectedAtom?.id">
-      <span>{{ atom.elementName }}</span>
-      <button class="delete-btn" (click)="deleteAtomClicked($event, atom)">X</button>
+         [class.selected]="atom.id === selectedAtom?.id"
+         [class.bonding-selected]="isSelectedForBonding(atom)">
+      <span class="atom-symbol">{{ getAtomSymbol(atom) }}</span>
+      <span class="atom-name">{{ atom.elementName }}</span>
+      <button class="delete-btn" (click)="deleteAtomClicked($event, atom)" title="Eliminar">×</button>
     </div>
-  </div>
-
-  <div *ngIf="molecules.length > 0">
-    <hr>
-    <p>Molecules Formed:</p>
-    <div *ngFor="let name of moleculeNames" class="molecule-name">
-      {{ name }}
-    </div>
-  </div>
-
-  <div *ngIf="discoveredMolecules.length > 0">
-    <hr>
-    <p>Discovered Molecules: {{ discoveredMolecules.length }}</p>
-    <div *ngFor="let molecule of discoveredMolecules" class="discovered-molecule">
-      <span class="molecule-name">{{ molecule }}</span>
-    </div>
-  </div>
-
-  <div class="energy-controls">
-    <hr>
-    <p>Energy System:</p>
-    <div class="ui-row">
-      <button
-        (click)="setEnergyType('electrolysis')"
-        [class.active]="currentEnergyType === 'electrolysis'">
-        Electrolysis
-      </button>
-      <button
-        (click)="setEnergyType('heat')"
-        [class.active]="currentEnergyType === 'heat'">
-        Heat
-      </button>
-      <button
-        (click)="setEnergyType('collision')"
-        [class.active]="currentEnergyType === 'collision'">
-        Collision
-      </button>
-    </div>
-    <p class="energy-instructions">
-      Global energy controls - individual atom energy application removed
-    </p>
-
-    <div class="ui-row">
-      <label>Global Heat: </label>
-      <button (click)="toggleGlobalHeating()" [class.active]="globalHeatEnabled">
-        {{ globalHeatEnabled ? 'On' : 'Off' }}
-      </button>
-    </div>
-    <div class="ui-row">
-      <label>Heat Intensity: {{ heatIntensity }}</label>
-      <input type="range" min="0" max="30" [value]="heatIntensity" (input)="heatIntensityChange($event)">
-    </div>
-    <div class="ui-row">
-      <label>Activation Energy: {{ activationEnergyWater }}</label>
-      <input type="range" min="0" max="30" [value]="activationEnergyWater" (input)="activationEnergyChange($event)">
-    </div>
-    <div class="ui-row">
-      <label>Strict Stoichiometry</label>
-      <button (click)="toggleStoichiometryStrict()" [class.active]="stoichiometryStrict">
-        {{ stoichiometryStrict ? 'Enabled' : 'Disabled' }}
-      </button>
-    </div>
-    <div class="ui-row">
-      <button (click)="applyGlobalHeatPulse()">Apply Heat Pulse</button>
-      <button (click)="applyGlobalElectrolysis()">Electrolyze All</button>
-    </div>
-  </div>
-
-  <div *ngIf="selectedAtom">
-    <hr>
-    <p>Controls for {{ selectedAtom.elementName }}:</p>
-    <div class="ui-row">
-      <span>Protons: {{ protons }}</span>
-      <button (click)="addProton()">+</button>
-      <button (click)="removeProton()">-</button>
-    </div>
-    <div class="ui-row">
-      <span>Neutrons: {{ neutrons }}</span>
-      <button (click)="addNeutron()">+</button>
-      <button (click)="removeNeutron()">-</button>
-    </div>
-    <div class="ui-row">
-      <span>Electrons: {{ electronsCount }}</span>
-      <button (click)="addElectron()">+</button>
-      <button (click)="removeElectron()">-</button>
-    </div>
-  </div>
-
-  <div *ngIf="selectedMolecule">
-    <hr>
-    <p>Selected Molecule: {{ selectedMolecule.name }}</p>
-    <p>Atoms: {{ selectedMolecule.atoms.length }}</p>
-    <p>Molecules can be moved by dragging but are not locked</p>
   </div>
 </div>
 
-<canvas #simulationCanvas style="display: block; width: 100vw; height: 100vh;"></canvas>
+<!-- Molecules Panel -->
+<div class="molecules-panel" 
+     *ngIf="molecules.length > 0"
+     [style.top.px]="panelPositions.molecules.y"
+     [style.right.px]="panelPositions.molecules.x"
+     [style.left]="'auto'"
+     (mousedown)="startDragPanel($event, 'molecules')">
+  <div class="drag-handle"></div>
+  <div class="panel-header">
+    <span>🧬 Moléculas Formadas</span>
+    <span class="molecule-count">{{ molecules.length }}</span>
+  </div>
+  <div class="molecule-list">
+    <div *ngFor="let mol of molecules" 
+         class="molecule-item"
+         (click)="selectMoleculeById(mol.id)"
+         [class.selected]="selectedMolecule?.id === mol.id">
+      <span class="molecule-name">{{ mol.name }}</span>
+      <span class="molecule-atoms">{{ mol.atoms.length }} átomos</span>
+    </div>
+  </div>
+</div>
+
+<!-- Selected Atom Info -->
+<div class="selected-info" 
+     *ngIf="selectedAtom && !selectedAtom.isMoleculeMember"
+     [style.bottom.px]="panelPositions.selectedInfo.y"
+     [style.right.px]="panelPositions.selectedInfo.x"
+     [style.left]="'auto'"
+     [style.top]="'auto'"
+     (mousedown)="startDragPanel($event, 'selectedInfo')">
+  <div class="drag-handle"></div>
+  <div class="info-header">
+    <span>⚛️ {{ selectedAtom.elementName }}</span>
+  </div>
+  <div class="info-content">
+    <div class="info-row">
+      <span>Protones:</span>
+      <div class="counter">
+        <button (click)="removeProton()" [disabled]="selectedAtom.protons <= 1">-</button>
+        <span>{{ protons }}</span>
+        <button (click)="addProton()">+</button>
+      </div>
+    </div>
+    <div class="info-row">
+      <span>Neutrones:</span>
+      <div class="counter">
+        <button (click)="removeNeutron()" [disabled]="selectedAtom.neutrons <= 0">-</button>
+        <span>{{ neutrons }}</span>
+        <button (click)="addNeutron()">+</button>
+      </div>
+    </div>
+    <div class="info-row">
+      <span>Electrones:</span>
+      <div class="counter">
+        <button (click)="removeElectron()" [disabled]="electronsCount <= 0">-</button>
+        <span>{{ electronsCount }}</span>
+        <button (click)="addElectron()">+</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Notification Toast -->
+<div class="notification-toast" *ngIf="notification" [class]="notification.type">
+  <span class="notification-icon">{{ getNotificationIcon() }}</span>
+  <span class="notification-message">{{ notification.message }}</span>
+</div>
+
+<!-- Pause Overlay -->
+<div class="pause-overlay" *ngIf="isPaused">
+  <div class="pause-content">
+    <span class="pause-icon">⏸️</span>
+    <span class="pause-text">PAUSADO</span>
+    <p class="pause-hint">Puedes mover átomos y crear enlaces mientras está pausado</p>
+  </div>
+</div>
+
+<!-- Canvas -->
+<canvas #simulationCanvas></canvas>
