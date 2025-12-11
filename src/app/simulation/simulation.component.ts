@@ -1055,6 +1055,7 @@ export class SimulationComponent implements AfterViewInit, OnDestroy {
     const bondThreshold = 4.0;
     const attractionThreshold = 8.0;
 
+    // Check for bonds between free atoms
     for (let i = 0; i < this.atoms.length; i++) {
       for (let j = i + 1; j < this.atoms.length; j++) {
         const atomA = this.atoms[i];
@@ -1092,6 +1093,297 @@ export class SimulationComponent implements AfterViewInit, OnDestroy {
         }
       }
     }
+
+    // Check for molecular reactions (molecules reacting with free atoms or other molecules)
+    this.checkMolecularReactions(systemEnergy, bondThreshold, attractionThreshold, now);
+  }
+
+  /**
+   * Check if molecules can react with free atoms or other molecules to form larger compounds
+   */
+  private checkMolecularReactions(systemEnergy: number, bondThreshold: number, attractionThreshold: number, now: number): void {
+    // Get free atoms (not part of any molecule)
+    const freeAtoms = this.atoms.filter(a => !a.isMoleculeMember);
+    
+    // Check molecule-atom reactions
+    for (const molecule of this.molecules) {
+      // Skip if molecule is already a complex compound (more than 2 atoms)
+      // Only simple diatomic molecules can be broken for reactions
+      if (molecule.atoms.length > 2) continue;
+      
+      const moleculePos = molecule.physicalBody.position;
+      
+      for (const freeAtom of freeAtoms) {
+        const freeAtomPos = freeAtom.physicalBody.position;
+        const distance = moleculePos.distanceTo(freeAtomPos);
+        
+        // Check if this could form a more stable/complex molecule
+        if (distance < attractionThreshold) {
+          const canReact = this.canMoleculeReactWithAtom(molecule, freeAtom, systemEnergy);
+          
+          if (canReact) {
+            const cooldownKey = `mol-${molecule.id}-atom-${freeAtom.id}`;
+            const lastAttempt = this.bondingCooldowns.get(cooldownKey) || 0;
+            if (now - lastAttempt < 3000) continue;
+            
+            if (distance < bondThreshold * 1.5) {
+              // Trigger reaction: break molecule and form new bonds
+              this.bondingCooldowns.set(cooldownKey, now);
+              this.triggerMolecularReaction(molecule, freeAtom);
+              return; // Process one reaction at a time
+            } else {
+              // Apply attraction force between molecule and free atom
+              const forceMagnitude = (attractionThreshold - distance) * 0.015;
+              const forceVector = new CANNON.Vec3(
+                freeAtomPos.x - moleculePos.x,
+                freeAtomPos.y - moleculePos.y,
+                freeAtomPos.z - moleculePos.z
+              );
+              forceVector.normalize();
+              forceVector.scale(forceMagnitude, forceVector);
+              
+              molecule.physicalBody.applyForce(forceVector, new CANNON.Vec3(0, 0, 0));
+              freeAtom.physicalBody.applyForce(forceVector.scale(-1, new CANNON.Vec3()), new CANNON.Vec3(0, 0, 0));
+            }
+          }
+        }
+      }
+    }
+    
+    // Check molecule-molecule reactions
+    for (let i = 0; i < this.molecules.length; i++) {
+      for (let j = i + 1; j < this.molecules.length; j++) {
+        const molA = this.molecules[i];
+        const molB = this.molecules[j];
+        
+        // Only allow reactions between simple molecules
+        if (molA.atoms.length > 2 || molB.atoms.length > 2) continue;
+        
+        const distance = molA.physicalBody.position.distanceTo(molB.physicalBody.position);
+        
+        if (distance < attractionThreshold) {
+          const canReact = this.canMoleculesReact(molA, molB, systemEnergy);
+          
+          if (canReact) {
+            const cooldownKey = `mol-${molA.id}-mol-${molB.id}`;
+            const lastAttempt = this.bondingCooldowns.get(cooldownKey) || 0;
+            if (now - lastAttempt < 3000) continue;
+            
+            if (distance < bondThreshold * 2) {
+              this.bondingCooldowns.set(cooldownKey, now);
+              this.triggerMoleculeMoleculeReaction(molA, molB);
+              return;
+            } else {
+              // Apply attraction
+              const forceMagnitude = (attractionThreshold - distance) * 0.01;
+              const forceVector = new CANNON.Vec3(
+                molB.physicalBody.position.x - molA.physicalBody.position.x,
+                molB.physicalBody.position.y - molA.physicalBody.position.y,
+                molB.physicalBody.position.z - molA.physicalBody.position.z
+              );
+              forceVector.normalize();
+              forceVector.scale(forceMagnitude, forceVector);
+              
+              molA.physicalBody.applyForce(forceVector, new CANNON.Vec3(0, 0, 0));
+              molB.physicalBody.applyForce(forceVector.scale(-1, new CANNON.Vec3()), new CANNON.Vec3(0, 0, 0));
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Check if a molecule can react with a free atom to form a more complex compound
+   */
+  private canMoleculeReactWithAtom(molecule: Molecule, freeAtom: Atom, systemEnergy: number): boolean {
+    // Get the composition of potential new molecule
+    const allAtoms = [...molecule.atoms, freeAtom];
+    const potentialMolecule = this.identifyMoleculeType(allAtoms);
+    
+    // If the result would be a known compound (not just "Compound"), it's a valid reaction
+    if (potentialMolecule && !potentialMolecule.name.startsWith('Compound')) {
+      // Check if we have enough energy for the reaction
+      const activationEnergy = this.calculateReactionActivationEnergy(molecule, freeAtom);
+      return systemEnergy >= activationEnergy;
+    }
+    
+    // Check if the free atom can bond with any atom in the molecule
+    for (const moleculeAtom of molecule.atoms) {
+      const bondsOnMoleculeAtom = this.countAtomBondsInMolecule(moleculeAtom, molecule);
+      const maxBondsForMoleculeAtom = this.maxBonds[moleculeAtom.protons] || 4;
+      
+      if (bondsOnMoleculeAtom < maxBondsForMoleculeAtom) {
+        // This atom in the molecule has available bonding sites
+        const freeAtomBonds = this.countAtomBonds(freeAtom);
+        const maxFreeAtomBonds = this.maxBonds[freeAtom.protons] || 4;
+        
+        if (freeAtomBonds < maxFreeAtomBonds) {
+          return systemEnergy >= 5; // Minimum energy for reaction
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if two molecules can react with each other
+   */
+  private canMoleculesReact(molA: Molecule, molB: Molecule, systemEnergy: number): boolean {
+    // Combine atoms and check if they form a known compound
+    const allAtoms = [...molA.atoms, ...molB.atoms];
+    const potentialMolecule = this.identifyMoleculeType(allAtoms);
+    
+    if (potentialMolecule && !potentialMolecule.name.startsWith('Compound')) {
+      const activationEnergy = this.calculateMoleculeMoleculeActivationEnergy(molA, molB);
+      return systemEnergy >= activationEnergy;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Calculate activation energy needed for molecule-atom reaction
+   */
+  private calculateReactionActivationEnergy(molecule: Molecule, freeAtom: Atom): number {
+    // Base energy depends on breaking existing bonds in the molecule
+    let baseEnergy = 5;
+    
+    // Diatomic molecules need more energy to break
+    if (molecule.atoms.length === 2) {
+      const atomA = molecule.atoms[0];
+      const atomB = molecule.atoms[1];
+      
+      // H-H bond is relatively weak
+      if (atomA.protons === 1 && atomB.protons === 1) {
+        baseEnergy = 8;
+      }
+      // O=O double bond is stronger
+      else if (atomA.protons === 8 && atomB.protons === 8) {
+        baseEnergy = 15;
+      }
+      // N≡N triple bond is very strong
+      else if (atomA.protons === 7 && atomB.protons === 7) {
+        baseEnergy = 25;
+      }
+    }
+    
+    return baseEnergy;
+  }
+
+  /**
+   * Calculate activation energy for molecule-molecule reaction
+   */
+  private calculateMoleculeMoleculeActivationEnergy(molA: Molecule, molB: Molecule): number {
+    return this.calculateReactionActivationEnergy(molA, molA.atoms[0]) + 
+           this.calculateReactionActivationEnergy(molB, molB.atoms[0]);
+  }
+
+  /**
+   * Count bonds for an atom within a molecule context
+   */
+  private countAtomBondsInMolecule(atom: Atom, molecule: Molecule): number {
+    // In a diatomic molecule, each atom has 1 bond (or more for double/triple bonds)
+    if (molecule.atoms.length === 2) {
+      // Check for multiple bonds based on element types
+      const otherAtom = molecule.atoms.find(a => a.id !== atom.id);
+      if (otherAtom) {
+        // O=O has double bond
+        if (atom.protons === 8 && otherAtom.protons === 8) return 2;
+        // N≡N has triple bond
+        if (atom.protons === 7 && otherAtom.protons === 7) return 3;
+      }
+      return 1;
+    }
+    
+    // For larger molecules, count actual bonds
+    return this.bonds.filter(b => 
+      (b.atomA.id === atom.id || b.atomB.id === atom.id) &&
+      molecule.atoms.some(a => a.id === b.atomA.id) &&
+      molecule.atoms.some(a => a.id === b.atomB.id)
+    ).length;
+  }
+
+  /**
+   * Trigger a reaction between a molecule and a free atom
+   */
+  private triggerMolecularReaction(molecule: Molecule, freeAtom: Atom): void {
+    this.reactionInProgress = true;
+    
+    // Store position for new atoms
+    const reactionCenter = new THREE.Vector3(
+      molecule.physicalBody.position.x,
+      molecule.physicalBody.position.y,
+      molecule.physicalBody.position.z
+    );
+    
+    // Break the molecule and release its atoms
+    this.breakMolecule(molecule, true);
+    
+    // Move the free atom closer to the reaction center
+    freeAtom.physicalBody.position.set(
+      reactionCenter.x + (Math.random() - 0.5) * 2,
+      reactionCenter.y + (Math.random() - 0.5) * 2,
+      reactionCenter.z + (Math.random() - 0.5) * 2
+    );
+    
+    // Give atoms some initial velocity toward each other
+    const releasedAtoms = this.atoms.filter(a => !a.isMoleculeMember);
+    releasedAtoms.forEach(atom => {
+      const dirToCenter = new CANNON.Vec3(
+        reactionCenter.x - atom.physicalBody.position.x,
+        reactionCenter.y - atom.physicalBody.position.y,
+        reactionCenter.z - atom.physicalBody.position.z
+      );
+      dirToCenter.normalize();
+      dirToCenter.scale(2, dirToCenter);
+      atom.physicalBody.velocity.copy(dirToCenter);
+    });
+    
+    this.showNotification('¡Reacción en progreso!', 'info');
+    
+    // Allow new bonds to form after a short delay
+    setTimeout(() => {
+      this.reactionInProgress = false;
+    }, 500);
+  }
+
+  /**
+   * Trigger a reaction between two molecules
+   */
+  private triggerMoleculeMoleculeReaction(molA: Molecule, molB: Molecule): void {
+    this.reactionInProgress = true;
+    
+    // Calculate reaction center
+    const reactionCenter = new THREE.Vector3(
+      (molA.physicalBody.position.x + molB.physicalBody.position.x) / 2,
+      (molA.physicalBody.position.y + molB.physicalBody.position.y) / 2,
+      (molA.physicalBody.position.z + molB.physicalBody.position.z) / 2
+    );
+    
+    // Break both molecules
+    this.breakMolecule(molA, true);
+    this.breakMolecule(molB, true);
+    
+    // Move released atoms toward reaction center
+    const releasedAtoms = this.atoms.filter(a => !a.isMoleculeMember);
+    releasedAtoms.forEach(atom => {
+      const dirToCenter = new CANNON.Vec3(
+        reactionCenter.x - atom.physicalBody.position.x,
+        reactionCenter.y - atom.physicalBody.position.y,
+        reactionCenter.z - atom.physicalBody.position.z
+      );
+      dirToCenter.normalize();
+      dirToCenter.scale(1.5, dirToCenter);
+      atom.physicalBody.velocity.copy(dirToCenter);
+    });
+    
+    this.showNotification('¡Reacción molecular en progreso!', 'info');
+    
+    setTimeout(() => {
+      this.reactionInProgress = false;
+    }, 500);
   }
 
   private shouldFormBond(atomA: Atom, atomB: Atom, systemEnergy: number): boolean {
